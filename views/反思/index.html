@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>大肥鱼 · 反思与感悟</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f3f6fa;
+      --card: #ffffff;
+      --text: #182235;
+      --muted: #69758a;
+      --line: #dfe6ef;
+      --accent: #2f7cf6;
+      --accent-soft: #e9f1ff;
+      --warm: #fff6e8;
+      --shadow: 0 12px 32px rgba(24, 34, 53, .07);
+    }
+    html[data-theme="dark"] {
+      --bg: #111722;
+      --card: #1a2230;
+      --text: #eef3fa;
+      --muted: #9aa8bd;
+      --line: #2a3546;
+      --accent: #73a7ff;
+      --accent-soft: #1d2b42;
+      --warm: #2a241b;
+      --shadow: 0 12px 32px rgba(0, 0, 0, .25);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.7 "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+    }
+    .wrap { max-width: 960px; margin: 0 auto; padding: 24px 18px 48px; }
+    header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+    h1 { margin: 0; font-size: 24px; letter-spacing: .02em; }
+    .sub { margin-top: 4px; color: var(--muted); font-size: 13px; }
+    .refresh {
+      border: 1px solid var(--line); background: var(--card); color: var(--text);
+      border-radius: 8px; padding: 8px 14px; cursor: pointer; white-space: nowrap;
+    }
+    .refresh:hover { border-color: var(--accent); color: var(--accent); }
+    .grid { display: grid; grid-template-columns: 1.25fr .75fr; gap: 16px; }
+    @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+      padding: 18px 20px; box-shadow: var(--shadow); margin-bottom: 16px;
+    }
+    .card h2 { margin: 0 0 4px; font-size: 16px; }
+    .date { color: var(--muted); font-size: 12px; }
+    .quote {
+      margin: 14px 0 0; padding: 14px 16px; border-left: 3px solid var(--accent);
+      background: var(--accent-soft); border-radius: 0 8px 8px 0; white-space: pre-wrap;
+    }
+    .warm { border-left-color: #d79a3a; background: var(--warm); }
+    .label { color: var(--muted); font-size: 12px; margin-top: 16px; text-transform: uppercase; letter-spacing: .08em; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .chip { background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 4px 10px; font-size: 12px; }
+    .chip.off { background: transparent; color: var(--muted); border: 1px dashed var(--line); }
+    .meta { color: var(--muted); font-size: 12px; }
+    .history { display: grid; gap: 10px; margin-top: 12px; }
+    .history-item { border-top: 1px solid var(--line); padding-top: 10px; }
+    .history-item:first-child { border-top: 0; padding-top: 0; }
+    .empty { color: var(--muted); padding: 28px 0; text-align: center; }
+    .error { color: #d14b4b; white-space: pre-wrap; }
+    .foot { color: var(--muted); font-size: 12px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>大肥鱼 · 反思与感悟</h1>
+        <div class="sub">每天凌晨 4 点回顾前一天，写给自己，也写给在意的人。</div>
+      </div>
+      <button class="refresh" id="refresh">刷新</button>
+    </header>
+    <div id="error" class="card error" hidden></div>
+    <div class="grid">
+      <div>
+        <section class="card">
+          <h2>最近一次反思</h2>
+          <div class="date" id="latestDate">加载中…</div>
+          <div id="selfBlock"></div>
+          <div id="friendBlock"></div>
+        </section>
+        <section class="card">
+          <h2>历史反思</h2>
+          <div class="history" id="history"></div>
+        </section>
+      </div>
+      <div>
+        <section class="card">
+          <h2>行为影响</h2>
+          <div class="meta">这些不只是展示，会进入对应会话的提示词。</div>
+          <div class="chips" id="effects"></div>
+          <div class="label">画像</div>
+          <div id="profile" class="meta"></div>
+          <div class="label">当前状态</div>
+          <div id="sessions" class="meta"></div>
+        </section>
+        <section class="card">
+          <h2>群聊安全版</h2>
+          <div class="meta">群聊只使用公开版，不包含私聊对象与秘密。</div>
+          <div id="groupSafe" class="quote"></div>
+        </section>
+      </div>
+    </div>
+    <div class="foot">只读页面 · 数据来自 feiyu_state 的每日反思与长期画像</div>
+  </div>
+  <script>
+    const API = "/astrbot_plugin_feiyu_reflection/reflection/overview";
+
+    function esc(value) {
+      return String(value ?? "").replace(/[&<>"']/g, (c) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[c]));
+    }
+
+    async function getBridge() {
+      const start = Date.now();
+      while (Date.now() - start < 4000) {
+        const bridge = window.AstrBotPluginPage;
+        if (bridge && typeof bridge.apiGet === "function") return bridge;
+        await new Promise((resolve) => setTimeout(resolve, 80));
+      }
+      return null;
+    }
+
+    async function fetchData() {
+      const bridge = await getBridge();
+      if (!bridge) throw new Error("页面桥接未就绪，请从 AstrBot 插件页打开。");
+      const candidates = [API, API.replace(/^\/+/, "")];
+      let lastError = null;
+      for (const endpoint of candidates) {
+        try {
+          const data = await bridge.apiGet(endpoint);
+          if (data && data.ok !== false) return data;
+          lastError = new Error(data?.message || data?.error || "接口返回错误");
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      throw lastError || new Error("无法读取反思数据");
+    }
+
+    function render(data) {
+      const reflection = data.reflection || {};
+      const hasReflection = Boolean(reflection.self || reflection.self_group || reflection.friend);
+      document.getElementById("latestDate").textContent = hasReflection
+        ? `${reflection.date || "未知日期"} · ${new Date((reflection.generated_at || 0) * 1000).toLocaleString("zh-CN")}`
+        : "还没有生成反思";
+      document.getElementById("selfBlock").innerHTML = reflection.self
+        ? `<div class="label">对自己的新认识</div><div class="quote">${esc(reflection.self)}</div>` : "";
+      document.getElementById("friendBlock").innerHTML = reflection.friend
+        ? `<div class="label">对朋友的观察 · 仅私聊</div><div class="quote warm">${esc(reflection.friend)}</div>` : "";
+      document.getElementById("groupSafe").textContent =
+        reflection.self_group || reflection.group || "暂无群聊安全版反思";
+
+      const effect = data.effect || {};
+      document.getElementById("effects").innerHTML = [
+        ["私聊注入", effect.private_prompt],
+        ["群聊注入", effect.group_prompt],
+        ["friend 仅私聊", effect.friend_private_only],
+      ].map(([label, on]) => `<span class="chip ${on ? "" : "off"}">${esc(label)}${on ? " ✓" : " —"}</span>`).join("");
+
+      const profile = data.profile || {};
+      document.getElementById("profile").innerHTML = [
+        profile.impression ? esc(profile.impression) : "暂无画像",
+        (profile.traits || []).length ? "特点：" + (profile.traits || []).map(esc).join("、") : "",
+        (profile.topics || []).length ? "常聊：" + (profile.topics || []).map(esc).join("、") : "",
+      ].filter(Boolean).join("<br>");
+
+      document.getElementById("sessions").innerHTML = (data.sessions || []).map((s) =>
+        `${s.scope === "group" ? "群聊" : "私聊"}：${esc(s.mood || "—")} / 精力 ${esc(s.energy ?? "—")} / 好感 ${esc(s.affection ?? "—")}`
+      ).join("<br>") || "暂无状态";
+
+      const history = data.history || [];
+      document.getElementById("history").innerHTML = history.length
+        ? history.slice().reverse().map((item) => `
+            <div class="history-item">
+              <div class="date">${esc(item.date || "")}</div>
+              <div>${esc(item.self || item.self_group || "（无）")}</div>
+            </div>`).join("")
+        : `<div class="empty">还没有历史反思。</div>`;
+    }
+
+    async function load() {
+      const error = document.getElementById("error");
+      error.hidden = true;
+      try {
+        render(await fetchData());
+      } catch (e) {
+        error.hidden = false;
+        error.textContent = String(e.message || e);
+      }
+    }
+
+    document.getElementById("refresh").addEventListener("click", load);
+    load();
+    setInterval(load, 60000);
+  </script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+# Runtime dependencies for astrbot_plugin_feiyu_reflection
+# Install inside AstrBot's Python environment.
+bilibili-api-python>=17.4.2
+httpx>=0.27.0,<1

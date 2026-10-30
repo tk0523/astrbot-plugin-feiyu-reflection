@@ -1,0 +1,66 @@
+<!-- 1) Put this card at the beginning of #panel-memory .observation-grid -->
+<article class="dream-card wide" id="feiyuReflectionCard">
+  <div class="dream-card-head">
+    <div>
+      <h2>大肥鱼的反思</h2>
+      <span id="feiyuReflectionMeta" class="muted">读取中…</span>
+    </div>
+    <b>feiyu_reflection</b>
+  </div>
+  <p id="feiyuReflectionSelf" class="muted">等待今日反思…</p>
+  <p id="feiyuReflectionFriend" class="muted"></p>
+  <p id="feiyuReflectionGroup" class="muted"></p>
+</article>
+
+<!-- 2) Put this before </body>, after companion-panel app.js -->
+<script>
+  (function () {
+    const api = "/astrbot_plugin_feiyu_reflection/reflection/overview";
+    const meta = document.getElementById("feiyuReflectionMeta");
+    const self = document.getElementById("feiyuReflectionSelf");
+    const friend = document.getElementById("feiyuReflectionFriend");
+    const group = document.getElementById("feiyuReflectionGroup");
+    if (!meta || !self || !friend || !group) return;
+
+    async function bridgeReady() {
+      const start = Date.now();
+      while (Date.now() - start < 4000) {
+        const bridge = window.AstrBotPluginPage;
+        if (bridge && typeof bridge.apiGet === "function") return bridge;
+        await new Promise((resolve) => setTimeout(resolve, 80));
+      }
+      return null;
+    }
+
+    async function load() {
+      try {
+        const bridge = await bridgeReady();
+        if (!bridge) {
+          meta.textContent = "页面桥接未就绪";
+          return;
+        }
+        let data = null;
+        for (const endpoint of [api, api.replace(/^\/+/, "")]) {
+          try {
+            const result = await bridge.apiGet(endpoint);
+            if (result && result.ok !== false) { data = result; break; }
+          } catch (error) { /* try next */ }
+        }
+        if (!data) {
+          meta.textContent = "未读到反思数据";
+          return;
+        }
+        const r = data.reflection || {};
+        meta.textContent = r.date ? `${r.date} · 每日 04:00` : "尚未生成";
+        self.textContent = r.self ? "对自己的新认识：" + r.self : "等待今天的自我反思…";
+        friend.textContent = r.friend ? "对朋友的观察（仅私聊）：" + r.friend : "";
+        group.textContent = r.self_group ? "群聊安全版：" + r.self_group : (r.group ? "群聊观察：" + r.group : "");
+      } catch (error) {
+        meta.textContent = "读取反思失败";
+      }
+    }
+
+    load();
+    setInterval(load, 60000);
+  })();
+</script>
